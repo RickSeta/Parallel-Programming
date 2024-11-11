@@ -2,6 +2,7 @@
 #include<stdlib.h>
 #include<time.h>
 #include<math.h>
+#include<mpi.h>
 #define N 5
 
 void print_matrix(int n, double **m) {
@@ -49,6 +50,8 @@ void order_matrix(int n, double **m) {
     int j = 0;
     int k = 0;
 
+    //paralelizar
+
     for (int i = 0; i < n-1; i++) {
 
         if (check_matrix(m, i)) i++;
@@ -68,27 +71,62 @@ void order_matrix(int n, double **m) {
 
 }
 
-void gaussian_elimination(int n, double **m) {
-    for (int i = 0; i < n; i++) {
+void gaussian_elimination(int n, double **m, int rank, int size) {
+    double* pivo_linha;
+    double** matriz;
+    if(rank ==0){
+        //bcast inicio
+        for (size_t i = 0; i < n; i++)
+        {
+            double factor = m[i][i];
+            m[i][i] = 1.0;
+
+            for (int j = i + 1; j < n; j++) m[i][j] /= factor;
+            MPI_Bcast(m[i], n , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        }
+        
+    }
+    else{
+
+        MPI_Bcast(pivo_linha, n , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        int parcela = (n/size) * rank;
+        int final = (rank == size-1)? n : parcela +(n/size); //ultimo processo pega oq sobrar
+        for (int i = parcela; i < final; i++) { //linhas as quais aquele processo é responsável
+
+            if (check_matrix(m, i)) i++;
+            for (int j = i+1; j < n; j++)
+            {
+                double o = m[i][i];
+                matriz[i][j] -= o* pivo_linha[j];
+            }
+            
+        }
+
+    }
+for (int i = 0; i < n; i++) {
 
         if (check_matrix(m, i)) i++;
+
 
         double factor = m[i][i];
         m[i][i] = 1.0;
 
         for (int j = i + 1; j < n; j++) m[i][j] /= factor;
 
-
+        //paralelizar
         for (int j = i + 1; j < n; j++) {
             double o = m[j][i];
             for (int k = 0; k < n; k++) m[j][k] = m[j][k] - o * m[i][k];
         }
+    
 
-    }
 }
 
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    int meu_ranque, num_procs, inicio, dest, raiz=0;
+    MPI_Status estado;
 
     srand((unsigned int) time(NULL));
 
