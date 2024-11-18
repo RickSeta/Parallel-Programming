@@ -71,59 +71,43 @@ void order_matrix(int n, double **m) {
 
 }
 
-void gaussian_elimination(int n, double **m, int rank, int size) {
-    double* pivo_linha;
-    double** matriz;
-    if(rank ==0){
-        //bcast inicio
-        for (size_t i = 0; i < n; i++)
-        {
-            double factor = m[i][i];
-            m[i][i] = 1.0;
+void gaussian_elimination(int n_linhas, double **m, int rank, int num_proc) {
+    int* pivo_linha;
+    for (int firstLine = 0; firstLine < n_linhas; firstLine++) {
 
-            for (int j = i + 1; j < n; j++) m[i][j] /= factor;
-            MPI_Bcast(m[i], n , MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        }
         
-    }
-    else{
-
-        MPI_Bcast(pivo_linha, n , MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        int parcela = (n/size) * rank;
-        int final = (rank == size-1)? n : parcela +(n/size); //ultimo processo pega oq sobrar
-        for (int i = parcela; i < final; i++) { //linhas as quais aquele processo é responsável
-
-            if (check_matrix(m, i)) i++;
-            for (int j = i+1; j < n; j++)
-            {
-                double o = m[i][i];
-                matriz[i][j] -= o* pivo_linha[j];
+        if (rank == 0) {
+            // Prepare pivot row in process 0
+            for (int j = firstLine + 1; j < n_linhas; j++) {
+                pivo_linha[j] = m[firstLine][j];
+                int pivFirst = pivo_linha[0];
+                for (int i = 0; i < n_linhas; i++) pivo_linha[i] /= pivFirst;
             }
-            
         }
+        MPI_Bcast(pivo_linha, n_linhas, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+        // Dynamically calculate the workload for each process in this iteration
+        int rows_left = n_linhas - firstLine - 1; // Remaining rows after the pivot row
+        int rows_per_proc = rows_left / num_proc; // Basic share of rows per process
+        int extra_rows = rows_left % num_proc; // Extra rows to distribute
+
+        int start_row = firstLine + 1 + rank * rows_per_proc + ((rank < extra_rows) ? rank : extra_rows);
+        int end_row = start_row + rows_per_proc + (rank < extra_rows ? 1 : 0);
+
+        // Process each assigned row within this iteration of firstLine
+        for (int i = start_row; i < end_row; i++) {
+            if (check_matrix(m, i)) continue;
+            double factor = m[i][firstLine];
+            for (int j = firstLine + 1; j < n_linhas; j++) {
+                m[i][j] -= factor * pivo_linha[j];
+            }
+            m[i][firstLine] = 0; // Set the pivot column element to zero after elimination
+        }
     }
-for (int i = 0; i < n; i++) {
-
-        if (check_matrix(m, i)) i++;
-
-
-        double factor = m[i][i];
-        m[i][i] = 1.0;
-
-        for (int j = i + 1; j < n; j++) m[i][j] /= factor;
-
-        //paralelizar
-        for (int j = i + 1; j < n; j++) {
-            double o = m[j][i];
-            for (int k = 0; k < n; k++) m[j][k] = m[j][k] - o * m[i][k];
-        }
-    
 
 }
 
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
 
     int meu_ranque, num_procs, inicio, dest, raiz=0;
     MPI_Status estado;
@@ -134,7 +118,13 @@ int main(int argc, char *argv[]) {
 
     order_matrix(N, m);
 
-    gaussian_elimination(N, m);
+    MPI_Init(&argc, argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &meu_ranque);
+
+    gaussian_elimination(N, m, meu_ranque, num_procs);
+    
+    MPI_Finalize();
 
     print_matrix(N, m);
 
