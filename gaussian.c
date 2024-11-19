@@ -28,6 +28,7 @@ double **fill_matrix(int n) {
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
+            //m[i][j] = 3*(i==j);
             m[i][j] = rand() / (double) RAND_MAX * (10 + 8) - 8.0;
         }
     }
@@ -72,42 +73,50 @@ void order_matrix(int n, double **m) {
 }
 
 void gaussian_elimination(int n_linhas, double **m, int rank, int num_proc) {
-    int* pivo_linha;
+    double* pivo_linha;
     for (int firstLine = 0; firstLine < n_linhas; firstLine++) {
 
         
         if (rank == 0) {
             // Prepare pivot row in process 0
-            for (int j = firstLine + 1; j < n_linhas; j++) {
-                pivo_linha[j] = m[firstLine][j];
-                int pivFirst = pivo_linha[0];
-                for (int i = 0; i < n_linhas; i++) pivo_linha[i] /= pivFirst;
-            }
+            pivo_linha = m[firstLine];
+            double piv = pivo_linha[firstLine];
+
+            for (int i = 0; i < n_linhas; i++){ 
+                printf("%lf ",pivo_linha[i]);
+                pivo_linha[i] /= piv;
+                
+                printf("%lf ",pivo_linha[i]);
+                }
+            
+            printf("\n ");
         }
         MPI_Bcast(pivo_linha, n_linhas, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        //todo mundo tem a linha pivo a partir daqui
 
         // Dynamically calculate the workload for each process in this iteration
         int rows_left = n_linhas - firstLine - 1; // Remaining rows after the pivot row
         int rows_per_proc = rows_left / num_proc; // Basic share of rows per process
         int extra_rows = rows_left % num_proc; // Extra rows to distribute
 
-        int start_row = firstLine + 1 + rank * rows_per_proc + ((rank < extra_rows) ? rank : extra_rows);
-        int end_row = start_row + rows_per_proc + (rank < extra_rows ? 1 : 0);
+        int start_row = firstLine + 1 + rank * rows_per_proc;
+        int end_row = start_row + rows_per_proc + ((rank == num_proc-1)? extra_rows: 0);
+
+        //cada processo tem o numero certo de linhas a partir daqui
 
         // Process each assigned row within this iteration of firstLine
         for (int i = start_row; i < end_row; i++) {
-            if (check_matrix(m, i)) continue;
+            //if (check_matrix(m, i)) continue;
             double factor = m[i][firstLine];
             for (int j = firstLine + 1; j < n_linhas; j++) {
                 m[i][j] -= factor * pivo_linha[j];
             }
-            m[i][firstLine] = 0; // Set the pivot column element to zero after elimination
         }
     }
 
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char **argv[]){
 
     int meu_ranque, num_procs, inicio, dest, raiz=0;
     MPI_Status estado;
@@ -126,7 +135,6 @@ int main(int argc, char *argv[]){
     
     MPI_Finalize();
 
-    print_matrix(N, m);
 
     for (int i = 0; i < N; i++) free(m[i]);
     free(m);
