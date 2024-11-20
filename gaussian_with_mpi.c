@@ -3,14 +3,15 @@
 #include<time.h>
 #include<math.h>
 #include<mpi.h>
-#define N 2
+#define N 3
 
-void print_matrix(int n, double **m, double *o) {
+void print_matrix(int n, double **m) {
+    int j;
     for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%8.2lf ", m[i][j]);
+        for (j = 0; j < n; j++) {
+            printf("%8.1lf ", m[i][j]);
         }
-        printf(" | %6.2lf", o[i]);
+        printf(" | %6.1lf", m[i][j]);
         puts("");
     }
     puts("");
@@ -24,27 +25,32 @@ double **fill_matrix(int n) {
     double **m = malloc(sizeof(double *) * n);
 
     for (int i = 0; i < n; i++)
-        m[i] = (double *) malloc(sizeof(double) * n);
+        m[i] = (double *) malloc(sizeof(double) * (n + 1));
 
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            m[i][j] = rand() / (double) RAND_MAX * (10 + 8) - 8.0;
-        }
-    }
+    // for (int i = 0; i < n; i++) {
+    //     for (int j = 0; j < n + 1; j++) {
+    //         m[i][j] = rand() / (double) RAND_MAX * (10 + 8) - 8.0;
+    //     }
+    // }
+
+    m[0][0] = 3.0;
+    m[0][1] = 2.0;
+    m[0][2] = -4.0;
+    m[1][0] = 2.0;
+    m[1][1] = 3.0;
+    m[1][2] = 3.0;
+    m[2][0] = 5.0;
+    m[2][1] = -3.0;
+    m[2][2] = 1.0;
+    m[0][3] = 3;
+    m[1][3] = 15;
+    m[2][3] = 14;
 
     return m;
 }
 
-double *fill_vector(int n) {
-    double *v = malloc(n * sizeof(double));
-
-    for (int i = 0; i < n; i++) v[i] = rand() / (double) RAND_MAX * (10 + 8) - 8.0;
-
-    return v;
-}
-
 void change_rows(int n, double **m, int max_value_pos, int j) {
-    for (int z = 0; z < n; z++) {
+    for (int z = 0; z < n + 1; z++) {
         double temp = m[max_value_pos][z];
         m[max_value_pos][z] = m[j][z];
         m[j][z] = temp;
@@ -52,45 +58,43 @@ void change_rows(int n, double **m, int max_value_pos, int j) {
 }
 
 
-void order_matrix(int n, double **m) {
-    int j = 0;
-    int k = 0;
+void order_matrix(int n, double **m, int i) {
+    double max_value = m[i][i];
+    int max_value_pos = i;
 
-    for (int i = 0; i < n - 1; i++) {
-        double max_value = m[i][i];
-        int max_value_pos = i;
-        for (j = n - 1; j > k; j--) {
-            if (fabs(m[j][i]) > fabs(max_value)) {
-                max_value = m[j][i];
-                max_value_pos = j;
-            }
+    for (int j = n - 1; j > -1; j--) {
+        if (fabs(m[j][i]) > fabs(max_value)) {
+            max_value = m[j][i];
+            max_value_pos = j;
         }
-        if (max_value != m[i][i])
-            change_rows(n, m, max_value_pos, j);
-        k++;
     }
+    if (max_value != m[i][i])
+        change_rows(n, m, max_value_pos, i);
 }
 
-void gaussian_elimination(int n, double **m, double *v) {
+void gaussian_elimination(int n, double **m) {
     for (int i = 0; i < n; i++) {
+        order_matrix(n, m, i);
+
+        // print_matrix(n, m);
+
         double pivot = m[i][i];
         m[i][i] = 1.0;
 
-        for (int j = i + 1; j < n; j++) m[i][j] /= pivot;
-
-        v[i] /= pivot;
-
+        for (int j = i + 1; j < n + 1; j++) m[i][j] /= pivot;
 
         for (int j = i + 1; j < n; j++) {
-            double const o = m[j][i];
-            v[j] -= o * v[j - 1];
-            for (int k = 0; k < n; k++) m[j][k] = m[j][k] - o * m[i][k];
+            double factor = m[j][i];
+            for (int k = 0; k < n + 1; k++) m[j][k] = m[j][k] - factor * m[i][k];
         }
+    }
 
+    // print_matrix(n, m);
+
+    for (int i = n - 1; i > -1; i--) {
         for (int j = i - 1; j > -1; j--) {
-            double const o = m[j][i];
-            v[j] -= o * v[j + 1];
-            for (int k = 0; k < n; k++) m[j][k] = m[j][k] - o * m[i][k];
+            double factor = m[j][i];
+            for (int k = 0; k < n + 1; k++) m[j][k] = m[j][k] - factor * m[i][k];
         }
     }
 }
@@ -101,25 +105,21 @@ void free_matrix(int n, double **m) {
 }
 
 
-void serial_gaussian_elimination(int n, double **m, double *o) {
-    order_matrix(n, m);
-
+void serial_gaussian_elimination(int n, double **m) {
     puts("Matriz inicial:\n");
-    print_matrix(n, m, o);
+    print_matrix(n, m);
 
-    gaussian_elimination(n, m, o);
+    gaussian_elimination(n, m);
 
     puts("Matriz resultante:\n");
-    print_matrix(n, m, o);
+    print_matrix(n, m);
 
     free_matrix(n, m);
-
-    free(o);
 }
 
 int main(int argc, char **argv) {
     int rank, procs;
-    double **m, *o, start_time, end_time;
+    double **m, start_time, end_time;
 
     srand(time(NULL));
 
@@ -131,8 +131,7 @@ int main(int argc, char **argv) {
     if (procs == 1) {
         start_time = MPI_Wtime();
         m = fill_matrix(N);
-        o = fill_vector(N);
-        serial_gaussian_elimination(N, m, o);
+        serial_gaussian_elimination(N, m);
         end_time = MPI_Wtime();
         printf("Tempo gasto: %lf\n", end_time - start_time);
     } else {
@@ -140,24 +139,21 @@ int main(int argc, char **argv) {
 
         if (rank == 0) {
             m = fill_matrix(N);
-            o = fill_vector(N);
             start_time = MPI_Wtime();
-            order_matrix(N, m);
         }
 
         for (int j = num_lines * rank; j < num_lines * rank + num_lines; j++) {
             double pivot = m[j][j];
             MPI_Bcast(&pivot, 1,MPI_DOUBLE, rank,MPI_COMM_WORLD);
-            MPI_Barrier(MPI_COMM_WORLD);
+
         }
 
         if (rank == 0) {
             puts("Resultado:\n");
-            print_matrix(N, m, o);
+            print_matrix(N, m);
             end_time = MPI_Wtime();
             printf("Tempo gasto: %lf\n", end_time - start_time);
             free_matrix(N, m);
-            free(o);
         }
     }
 
