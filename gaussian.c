@@ -2,7 +2,6 @@
 #include<stdlib.h>
 #include<time.h>
 #include<math.h>
-#include<mpi.h>
 #define N 5
 
 void print_matrix(int n, double **m) {
@@ -72,72 +71,69 @@ void order_matrix(int n, double **m) {
 
 }
 
-void gaussian_elimination(int n_linhas, double **m, int rank, int num_proc) {
-    double* pivo_linha;
-    for (int firstLine = 0; firstLine < n_linhas; firstLine++) {
+double** appendMatrix(int n, double matrix[n][n], double vector[n]) {
+    int rows = n;
+    int cols = n;
+    int new_cols = cols + 1;
 
-        
-        if (rank == 0) {
-            // Prepare pivot row in process 0
-            pivo_linha = m[firstLine];
-            double piv = pivo_linha[firstLine];
+    // Allocate memory for the new matrix
+    double** new_matrix = (double**)malloc(rows * sizeof(double*));
+    for (int i = 0; i < rows; i++) {
+        new_matrix[i] = (double*)malloc(new_cols * sizeof(double));
+    }
 
-            for (int i = 0; i < n_linhas; i++){ 
-                printf("%lf ",pivo_linha[i]);
-                pivo_linha[i] /= piv;
-                
-                printf("%lf ",pivo_linha[i]);
-                }
-            
-            printf("\n ");
-        }
-        MPI_Bcast(pivo_linha, n_linhas, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        //todo mundo tem a linha pivo a partir daqui
-
-        // Dynamically calculate the workload for each process in this iteration
-        int rows_left = n_linhas - firstLine - 1; // Remaining rows after the pivot row
-        int rows_per_proc = rows_left / num_proc; // Basic share of rows per process
-        int extra_rows = rows_left % num_proc; // Extra rows to distribute
-
-        int start_row = firstLine + 1 + rank * rows_per_proc;
-        int end_row = start_row + rows_per_proc + ((rank == num_proc-1)? extra_rows: 0);
-
-        //cada processo tem o numero certo de linhas a partir daqui
-
-        // Process each assigned row within this iteration of firstLine
-        for (int i = start_row; i < end_row; i++) {
-            //if (check_matrix(m, i)) continue;
-            double factor = m[i][firstLine];
-            for (int j = firstLine + 1; j < n_linhas; j++) {
-                m[i][j] -= factor * pivo_linha[j];
-            }
+    // Copy elements from the original matrix
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            new_matrix[i][j] = matrix[i][j];
         }
     }
 
+    // Copy elements from the vector to the new column
+    for (int i = 0; i < rows; i++) {
+        new_matrix[i][new_cols - 1] = vector[i];
+    }
+
+    return new_matrix;
+}
+
+void gaussianElimination(int n, double** matrix) {
+    // Augment the matrix with the vector
+
+    
+
+
+    
 }
 
 int main(int argc, char **argv[]){
 
     int meu_ranque, num_procs, inicio, dest, raiz=0;
-    MPI_Status estado;
 
-    srand((unsigned int) time(NULL));
-
-    double **m = fill_matrix(N);
-
-    order_matrix(N, m);
-
-    MPI_Init(&argc, argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &meu_ranque);
-
-    gaussian_elimination(N, m, meu_ranque, num_procs);
-    
-    MPI_Finalize();
+    int n = 3; // Number of variables
+    double matrix[3][3] = {
+        {2, 1, -1},
+        {-3, -1, 2},
+        {-2, 1, 2}
+    };
+    double vector[3] = {8, -11, -3};
+    double** expanded_matrix = appendMatrix(3, matrix, vector);
 
 
-    for (int i = 0; i < N; i++) free(m[i]);
-    free(m);
+
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n+1; j++) {
+            printf("%lf ", expanded_matrix[i][j]);
+        }
+        printf("\n");
+    }
+
+    // Free the memory
+    for (int i = 0; i < n; i++) {
+        free(expanded_matrix[i]);
+    }
+    free(expanded_matrix);
 
     return 0;
 }
