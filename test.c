@@ -21,69 +21,47 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
     {
         MPI_Bcast(A[norm], N + 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-        if (rank == 0)
+        for (row = norm + 1 + rank; row < N; row += num_procs)
         {
-            for (i = 1; i < num_procs; i++)
+            int mod = rank == 1;
+            multiplier = A[row - mod][norm] / A[norm][norm];
+            for (col = norm; col < N + 1; col++)
             {
-                for (row = norm + 1 + i; row < N; row += num_procs)
-                {
-                    MPI_Send(A[row], N + 1, MPI_FLOAT, i, 0, MPI_COMM_WORLD);
-                }
-            }
-
-            for (row = norm + 1; row < N; row += num_procs)
-            {
-                multiplier = A[row][norm] / A[norm][norm];
-                for (col = norm; col < N + 1; col++)
-                {
-                    A[row][col] -= A[norm][col] * multiplier;
-                }
-            }
-
-            for (i = 1; i < num_procs; i++)
-            {
-                for (row = norm + 1 + i; row < N; row += num_procs)
-                {
-                    MPI_Recv(A[row], N + 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD, &status);
-                }
+                A[row - mod][col] -= A[norm][col] * multiplier;
             }
         }
-        else
-        {
-            for (row = norm + 1 + rank; row < N; row += num_procs)
-            {
-                MPI_Recv(A[row - 1], N + 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
-                multiplier = A[row - 1][norm] / A[norm][norm];
-                for (col = norm; col < N + 1; col++)
-                {
-                    A[row - 1][col] -= A[norm][col] * multiplier;
-                }
-                MPI_Send(A[row - 1], N + 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD);
-            }
-        }
+
         MPI_Barrier(MPI_COMM_WORLD);
     }
 }
 
 void generate_matrix(float **A)
 {
-    int i, j;
+    int i, j, e = 0;
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < N + 1; j++)
         {
             A[i][j] = (rand() / 50000);
+            printf("%d", e++);
         }
     }
 }
 
-void fill_diagonal_matrix(int N, float **matrix) {
-    // Loop through each row
-    for (int i = 0; i < N; i++) {
-        // Loop through each column
-        for (int j = 0; j < N; j++) {
-            // Set 1 for diagonal elements, 0 otherwise
-            matrix[i][j] = (i == j);
+void fill_diagonal_matrix(int N, float **matrix)
+{
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j <= N; j++)
+        {
+            if (j == N)
+            {
+                matrix[i][j] = 4;
+            }
+            else
+            {
+                matrix[i][j] = (i == j) * (i + 1);
+            }
         }
     }
 }
@@ -148,12 +126,9 @@ int main(int argc, char **argv)
 
     if (rank == 0)
     {
-        generate_matrix(A);
-        // fill_diagonal_matrix(N, A);
-    }
+        // generate_matrix(A);
+        fill_diagonal_matrix(N, A);
 
-    if (rank == 0)
-    {
         printf("\nStart  MPI...Process=%d\n", rank);
         start_time = MPI_Wtime();
     }
@@ -169,7 +144,6 @@ int main(int argc, char **argv)
         end_time = MPI_Wtime();
         printf("\nelapsed time = %f\n", end_time - start_time);
     }
-    
 
     for (int i = 0; i < N; i++)
         free(A[i]);
