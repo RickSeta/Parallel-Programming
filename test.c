@@ -9,6 +9,7 @@ const int N = 4;
 
 void gauss_elimination(float **A, float *x, int rank, int num_procs)
 {
+    // 0 > 1 ;  1 > 2;  2 > 3; 3 > 4;
 
     MPI_Status status;
     MPI_Request request;
@@ -23,11 +24,11 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
 
         for (row = norm + 1 + rank; row < N; row += num_procs)
         {
-            int mod = rank == 1;
-            multiplier = A[row - mod][norm] / A[norm][norm];
+            printf("meu rank é e %i a linha que peguei é %i \n", rank, row-1);
+            multiplier = A[row][norm] / A[norm][norm];
             for (col = norm; col < N + 1; col++)
             {
-                A[row - mod][col] -= A[norm][col] * multiplier;
+                A[row][col] -= A[norm][col] * multiplier;
             }
         }
 
@@ -43,7 +44,6 @@ void generate_matrix(float **A)
         for (j = 0; j < N + 1; j++)
         {
             A[i][j] = (rand() / 50000);
-            printf("%d", e++);
         }
     }
 }
