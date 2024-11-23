@@ -5,7 +5,7 @@
 #include <mpi.h>
 #include <math.h>
 
-int N = 4;
+const int N = 4;
 
 void gauss_elimination(float **A, float *x, int rank, int num_procs)
 {
@@ -19,7 +19,7 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
 
     for (norm = 0; norm < N - 1; norm++)
     {
-        MPI_Bcast(&(A[norm][0]), N + 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(A[norm], N + 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
         if (rank == 0)
         {
@@ -27,8 +27,7 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
             {
                 for (row = norm + 1 + i; row < N; row += num_procs)
                 {
-                    MPI_Isend(&(A[row][0]), N + 1, MPI_FLOAT, i, 0, MPI_COMM_WORLD, &request);
-                    MPI_Wait(&request, &status);
+                    MPI_Send(A[row], N + 1, MPI_FLOAT, i, 0, MPI_COMM_WORLD);
                 }
             }
 
@@ -45,7 +44,7 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
             {
                 for (row = norm + 1 + i; row < N; row += num_procs)
                 {
-                    MPI_Recv(&A[row][0], N + 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD, &status);
+                    MPI_Recv(A[row], N + 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD, &status);
                 }
             }
         }
@@ -53,14 +52,13 @@ void gauss_elimination(float **A, float *x, int rank, int num_procs)
         {
             for (row = norm + 1 + rank; row < N; row += num_procs)
             {
-                MPI_Recv(&(A[row - 1][0]), N + 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+                MPI_Recv(A[row - 1], N + 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
                 multiplier = A[row - 1][norm] / A[norm][norm];
                 for (col = norm; col < N + 1; col++)
                 {
                     A[row - 1][col] -= A[norm][col] * multiplier;
                 }
-                MPI_Isend(&(A[row - 1][0]), N + 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, &request);
-                MPI_Wait(&request, &status);
+                MPI_Send(A[row - 1], N + 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD);
             }
         }
         MPI_Barrier(MPI_COMM_WORLD);
@@ -75,6 +73,17 @@ void generate_matrix(float **A)
         for (j = 0; j < N + 1; j++)
         {
             A[i][j] = (rand() / 50000);
+        }
+    }
+}
+
+void fill_diagonal_matrix(int N, float **matrix) {
+    // Loop through each row
+    for (int i = 0; i < N; i++) {
+        // Loop through each column
+        for (int j = 0; j < N; j++) {
+            // Set 1 for diagonal elements, 0 otherwise
+            matrix[i][j] = (i == j);
         }
     }
 }
@@ -140,6 +149,7 @@ int main(int argc, char **argv)
     if (rank == 0)
     {
         generate_matrix(A);
+        // fill_diagonal_matrix(N, A);
     }
 
     if (rank == 0)
