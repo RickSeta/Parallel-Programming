@@ -56,7 +56,7 @@ void fill_pivot_line(int n, int o, double pivot_line[o], double m[n][o], int i)
     }
 }
 
-void gaussian_elimination_MPI(int rank, double m[512][513], double pivot_line[513], int num_lines, double local_matrix[512][513])
+void gaussian_elimination_MPI(int rank, double m[N][N + 1], double pivot_line[N+1], int num_lines, double local_matrix[N][N+1])
 {
     for (int i = 0; i < N; i++)
     {
