@@ -5,7 +5,7 @@
 #include <omp.h>
 typedef enum { false, true } bool;
 
-#define N 4 // 5000 50000 100000
+#define N 65536 // 5000 50000 100000
 
 int *create_array(int const n) {
     int *m = malloc(sizeof(int) * n);
@@ -18,7 +18,7 @@ int *create_array(int const n) {
 int* merge(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
     if(tamanho > 1){
         int meio = tamanho / 2;
-
+        #pragma omp parallel for
         for (int i = menor_index; i < menor_index + meio; i++) {
             if (ordem_crescente == (arr[i] > arr[i + meio])) {
                 int temp = arr[i];
@@ -26,7 +26,13 @@ int* merge(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
                 arr[i + meio] = temp;
             }
         }
-        
+        // #pragma omp parallel sections
+        // {
+        //     #pragma omp section
+        //     merge(arr, menor_index, meio, ordem_crescente);
+        //     #pragma omp section
+        //     merge(arr, menor_index + meio, meio, ordem_crescente);
+        // }
         merge(arr, menor_index, meio, ordem_crescente);
         merge(arr, menor_index + meio, meio, ordem_crescente);
     }
@@ -66,22 +72,20 @@ void bubble_sort(int *m, const int n) {
 
 int main() {
     srand(time(NULL));
-
+    (void) omp_set_num_threads(4);
     int *bitonic_seq = create_array(N);
-    // int *bubble_sort_seq = create_array(N);
-    for (int i = 0; i < N; i++) {
-        printf("%d ", bitonic_seq[i]);
-    }
-    printf("\n");
-    create_bitonic_seq(bitonic_seq, 0, N, true);
+    int *bubble_sort_seq = create_array(N);
 
-    // bubble_sort(bubble_sort_seq, N);
-    for (int i = 0; i < N; i++) {
-        printf("%d ", bitonic_seq[i]);
-    }
+    
+    clock_t start = clock();
+    create_bitonic_seq(bitonic_seq, 0, N, true);
+    clock_t end = clock();
+
+    printf("Tempo Gasto bitonic: %.4f s.\n", (double) (end - start) / (double) CLOCKS_PER_SEC);
+    bubble_sort(bubble_sort_seq, N);
     printf("\n");
     free(bitonic_seq);
-    // free(bubble_sort_seq);
+    free(bubble_sort_seq);
 
     return 0;
 }
