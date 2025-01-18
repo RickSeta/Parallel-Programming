@@ -8,7 +8,7 @@ typedef enum {
     false, true
 } bool;
 
-#define N 524288 // 50000 2*16 | 100000 2**17 | 500000 2**19
+#define N 65536  // 50000 65536 (2*16) | 100000 131072 (2**17) | 500000 524288 (2**19)
 
 int *create_array(int const n) {
     int *m = malloc(sizeof(int) * n);
@@ -18,7 +18,7 @@ int *create_array(int const n) {
     return m;
 }
 
-int *merge(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
+void merge(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
     if (tamanho > 1) {
         int meio = tamanho / 2;
         #pragma omp parallel for
@@ -42,7 +42,7 @@ int *merge(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
 }
 
 
-int *create_bitonic_seq(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
+void create_bitonic_seq(int *arr, int menor_index, int tamanho, bool ordem_crescente) {
     if (tamanho > 1) {
         int meio = tamanho / 2;
         create_bitonic_seq(arr, menor_index, meio, true);
@@ -65,7 +65,7 @@ void bubble_sort(int *m, const int n) {
     clock_t start = clock();
 
     for (int i = 0; i < n; i++) {
-        #pragma omp parallel for num_threads(2), default(none) shared(i, n, m)
+        #pragma omp parallel for default(none) shared(i, n, m)
         for (int j = i % 2; j < n - 1; j += 2) {
             if (m[j] > m[j + 1]) {
                 int const temp = m[j];
@@ -77,7 +77,7 @@ void bubble_sort(int *m, const int n) {
 
     clock_t end = clock();
 
-    printf("Tempo Gasto: %.4f s.\n", (double) (end - start) / (double) CLOCKS_PER_SEC);
+    printf("Tempo Gasto bubble sort: %.4f s.\n", (double) (end - start) / (double) CLOCKS_PER_SEC);
 }
 
 
@@ -92,7 +92,7 @@ int main() {
 
     bitonic_sort(bitonic_seq);
 
-    //    bubble_sort(bubble_sort_seq, N);
+    bubble_sort(bubble_sort_seq, N);
 
 
     free(bitonic_seq);
